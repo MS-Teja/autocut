@@ -1,0 +1,7 @@
+tests/data/
+__pycache__/
+*.autocut.json
+*.autocut.lua
+.DS_Store
+CLAUDE.md
+*.fcpxml
