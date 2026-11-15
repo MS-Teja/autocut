@@ -132,6 +132,15 @@ def test_a_false_start_cannot_join_two_lines():
     assert groups == {0: 0, 1: 0, 2: 2, 3: 2, 4: 2}, groups
 
 
+def test_restart_cut_finds_the_pause_before_the_match():
+    rng = np.random.default_rng(1)
+    audio = (rng.standard_normal(2 * A.SR) * 0.3).astype(np.float32)   # speech-like noise
+    audio[int(1.00 * A.SR):int(1.05 * A.SR)] = 0                       # the pause before the second read
+    cut = A.restart_cut(audio, int(1.45 * A.SR), 0)
+    assert abs(cut / A.SR - 1.00) < 0.06, cut / A.SR
+    assert A.restart_cut(audio, int(1.45 * A.SR), int(1.2 * A.SR)) >= int(1.2 * A.SR)  # never before earliest
+
+
 def test_voice_onset_walks_back_to_the_rise():
     db = np.full(100, 5.0)
     db[52:] = 60          # Silero's start, at the vowel

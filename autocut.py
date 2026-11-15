@@ -37,7 +37,7 @@ from pathlib import Path
 import numpy as np
 
 VERSION = 1
-TRANSCRIPT_METHOD = "per-region-2"  # transcripts cached by other methods are missing repeated lines
+TRANSCRIPT_METHOD = "per-region-3"  # transcripts cached by other methods are missing repeated lines
 SR = 16000
 FPS_E = 100  # energy frames per second (10 ms hop)
 HOP = SR // FPS_E
@@ -372,6 +372,14 @@ def load_whisper(name: str, compute_type: str):
     return _loaded_models[(name, compute_type)]
 
 
+def restart_cut(audio: np.ndarray, match: int, earliest: int) -> int:
+    """Where to cut before a line read again without a pause: the quietest 10 ms in the 0.6 s before
+    the voice match (to just after it). The match lands late, often mid-word, because a short soft
+    first word stretches easily in the alignment; the restart is the pause before it."""
+    near = max(earliest, match - int(0.6 * SR))
+    return near + int(np.argmin(frame_db(audio[near:match + SR // 7]))) * HOP
+
+
 def transcribe(audio, model_name, language, compute_type, beam_size, duration):
     from faster_whisper.vad import VadOptions, get_speech_timestamps
 
@@ -414,9 +422,7 @@ def transcribe(audio, model_name, language, compute_type, beam_size, duration):
         lag = self_repeat(features, (a + margin) / SR, (b - margin) / SR)
         if lag is None:
             return hear(a, b)
-        at = a + margin + int(lag * SR)
-        near = max(a, at - SR // 7)
-        at = near + int(np.argmin(frame_db(audio[near:at + SR // 7]))) * HOP  # cut in the quietest spot
+        at = restart_cut(audio, a + margin + int(lag * SR), a + margin)
         first, second = hear(a, at), hear(at, b)
         if opens_alike(norm_words(" ".join(w["text"] for w in first)), norm_words(" ".join(w["text"] for w in second))):
             restart_times.append(at / SR)
